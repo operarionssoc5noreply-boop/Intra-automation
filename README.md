@@ -8,10 +8,11 @@ Lightweight bot server for SeaTalk. Google Apps Script watches cell `AD1` in you
 2. The script reads `AD1` and compares it with the last stored value.
 3. If `AD1` did not change, nothing happens.
 4. If `AD1` changed, Apps Script sends `POST /trigger` to this bot.
-5. The bot exports the configured Google Sheets range as PDF.
-6. The bot converts the PDF to PNG with Poppler.
-7. The bot trims and optimizes the PNG with ImageMagick.
-8. The bot sends one interactive SeaTalk card with the rendered image and report link.
+5. The bot waits 7 seconds by default so formula-driven cells can settle.
+6. The bot exports the configured Google Sheets range as PDF.
+7. The bot converts the PDF to PNG with Poppler.
+8. The bot trims and optimizes the PNG with ImageMagick.
+9. The bot sends one interactive SeaTalk card with the rendered image and report link.
 
 ## Main Parts
 
@@ -39,6 +40,7 @@ BOT_PORT=8080
 BOT_TIMEZONE=Asia/Manila
 BOT_REQUEST_TIMEOUT_SECONDS=30
 BOT_RUN_ON_STARTUP=false
+BOT_CAPTURE_DELAY_SECONDS=7
 BOT_PDF_DPI=220
 BOT_IMAGE_BORDER_PX=20
 BOT_IMAGE_RESIZE_WIDTH=2200
@@ -48,6 +50,7 @@ GOOGLE_SERVICE_ACCOUNT_FILE=google-service-account.json
 ```
 
 `TRIGGER_SHARED_SECRET` is recommended if the bot is exposed on the internet. The Apps Script sends the same secret in its trigger request.
+`BOT_CAPTURE_DELAY_SECONDS` applies to Apps Script-triggered range changes before the bot captures `capture_range`.
 
 ## Apps Script Setup
 

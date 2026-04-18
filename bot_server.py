@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from http import HTTPStatus
@@ -64,6 +65,7 @@ class Config:
     port: int
     request_timeout_seconds: int
     run_on_startup: bool
+    capture_delay_seconds: int
     pdf_dpi: int
     image_border_px: int
     image_resize_width: int
@@ -115,6 +117,8 @@ def validate_config(config: Config) -> None:
         raise ValueError(f"Missing required config values: {', '.join(missing)}")
     if config.pdf_dpi <= 0:
         raise ValueError("BOT_PDF_DPI must be greater than 0.")
+    if config.capture_delay_seconds < 0:
+        raise ValueError("BOT_CAPTURE_DELAY_SECONDS must be zero or greater.")
     if config.image_border_px < 0:
         raise ValueError("BOT_IMAGE_BORDER_PX must be zero or greater.")
     if config.image_resize_width <= 0:
@@ -168,6 +172,9 @@ def load_config() -> Config:
             get_setting(env_file_values, "request_timeout_seconds", "BOT_REQUEST_TIMEOUT_SECONDS", "30")
         ),
         run_on_startup=parse_bool(get_setting(env_file_values, "run_on_startup", "BOT_RUN_ON_STARTUP", ""), False),
+        capture_delay_seconds=int(
+            get_setting(env_file_values, "capture_delay_seconds", "BOT_CAPTURE_DELAY_SECONDS", "7")
+        ),
         pdf_dpi=int(get_setting(env_file_values, "pdf_dpi", "BOT_PDF_DPI", "220")),
         image_border_px=int(get_setting(env_file_values, "image_border_px", "BOT_IMAGE_BORDER_PX", "20")),
         image_resize_width=int(get_setting(env_file_values, "image_resize_width", "BOT_IMAGE_RESIZE_WIDTH", "2200")),
@@ -352,6 +359,7 @@ class SeatalkBotService:
         )
 
         try:
+            self.wait_before_capture(trigger, trigger_metadata)
             image_bytes = self.render_report_image()
             payload = self.build_message_payload(started_at, image_bytes, trigger_metadata=trigger_metadata)
             self.post_to_seatalk(payload)
@@ -366,6 +374,29 @@ class SeatalkBotService:
         finally:
             self.last_run_finished_at = datetime.now(self.timezone)
             self.run_lock.release()
+
+    def wait_before_capture(self, trigger: str, trigger_metadata: dict[str, Any] | None = None) -> None:
+        delay_seconds = self.get_capture_delay_seconds(trigger, trigger_metadata)
+        if delay_seconds <= 0:
+            return
+
+        LOGGER.info(
+            "Waiting %s seconds before capturing range. trigger=%s source=%s",
+            delay_seconds,
+            trigger,
+            (trigger_metadata or {}).get("source", "external"),
+        )
+        time.sleep(delay_seconds)
+
+    def get_capture_delay_seconds(self, trigger: str, trigger_metadata: dict[str, Any] | None = None) -> int:
+        if self.config.capture_delay_seconds <= 0:
+            return 0
+
+        normalized_trigger = trigger.strip().lower()
+        normalized_source = str((trigger_metadata or {}).get("source") or "").strip().lower()
+        if normalized_trigger == "apps_script_cell_change" or normalized_source == "google_apps_script":
+            return self.config.capture_delay_seconds
+        return 0
 
     def render_report_image(self) -> bytes:
         runtime_root = Path(".runtime")
@@ -569,6 +600,7 @@ class SeatalkBotService:
             "last_trigger_metadata": self.last_trigger_metadata,
             "last_error": self.last_error,
             "capture_range": self.config.capture_range,
+            "capture_delay_seconds": self.config.capture_delay_seconds,
             "tab_name": self.config.tab_name,
             "trigger_auth_enabled": bool(self.config.trigger_shared_secret),
         }
