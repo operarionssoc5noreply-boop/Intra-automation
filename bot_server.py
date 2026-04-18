@@ -173,7 +173,7 @@ def load_config() -> Config:
         ),
         run_on_startup=parse_bool(get_setting(env_file_values, "run_on_startup", "BOT_RUN_ON_STARTUP", ""), False),
         capture_delay_seconds=int(
-            get_setting(env_file_values, "capture_delay_seconds", "BOT_CAPTURE_DELAY_SECONDS", "7")
+            get_setting(env_file_values, "capture_delay_seconds", "BOT_CAPTURE_DELAY_SECONDS", "20")
         ),
         pdf_dpi=int(get_setting(env_file_values, "pdf_dpi", "BOT_PDF_DPI", "220")),
         image_border_px=int(get_setting(env_file_values, "image_border_px", "BOT_IMAGE_BORDER_PX", "20")),
